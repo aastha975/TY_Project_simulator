@@ -16,3 +16,6 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# Private project documentation
+docs-private/
