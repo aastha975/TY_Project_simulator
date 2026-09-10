@@ -22,6 +22,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 6. Initial Calculation Run
   triggerCalculation();
+  updateFactoryBaselineDisplay();
+
+  // Require factory baseline inputs on first use so all outputs are personalized.
+  if (localStorage.getItem('netzero_baseline_completed') !== 'true') {
+    openBaselineSetup();
+  }
 });
 
 function setupSliderBindings() {
@@ -77,6 +83,20 @@ function setupSliderBindings() {
   document.getElementById('btnToggleTheme')?.addEventListener('click', () => {
     window.appState.toggleTheme();
   });
+
+  document.getElementById('btnResetPlan')?.addEventListener('click', () => {
+    if (!window.confirm('Reset all decarbonization sliders to the starting plan? Your company baseline will be preserved.')) return;
+
+    window.appState.resetLevers();
+    sliderMap.forEach(item => {
+      const slider = document.getElementById(item.id);
+      const label = document.getElementById(item.label);
+      const value = window.appState.levers[item.key];
+      if (slider) slider.value = value;
+      if (label) label.textContent = value;
+    });
+    triggerCalculation();
+  });
 }
 
 function setupProcessTwinNavigation() {
@@ -115,6 +135,12 @@ function renderKPIs(data) {
   const em = data.emissions;
   const fin = data.financials;
   const isTonnes = window.appState.unitMode === 'tonnes';
+  const pathwaySummary = document.getElementById('chartPathwaySummary');
+  if (pathwaySummary) {
+    const baselineTotal = data.baselineEmissions?.totalEmissionsTonnes || em.totalEmissionsTonnes;
+    const reduction = baselineTotal > 0 ? ((baselineTotal - em.totalEmissionsTonnes) / baselineTotal) * 100 : 0;
+    pathwaySummary.textContent = `Active plan: ${em.totalEmissionsTonnes.toLocaleString(undefined, { maximumFractionDigits: 0 })} t/yr (${reduction >= 0 ? '-' : '+'}${Math.abs(reduction).toFixed(1)}%)`;
+  }
 
   // Carbon Intensity
   document.getElementById('kpiCarbonIntensity').textContent = em.carbonIntensityGramsPerBottle.toFixed(1);
@@ -199,19 +225,31 @@ window.applyOptimizerPackage = function(pkgId) {
 function setupModalHandlers() {
   // Baseline Modal
   const baselineModal = document.getElementById('baselineModal');
-  document.getElementById('btnEditBaseline')?.addEventListener('click', () => { baselineModal.style.display = 'flex'; });
+  document.getElementById('btnEditBaseline')?.addEventListener('click', () => {
+    populateBaselineInputs();
+    baselineModal.style.display = 'flex';
+  });
   document.getElementById('btnCloseBaselineModal')?.addEventListener('click', () => { baselineModal.style.display = 'none'; });
   document.getElementById('btnCancelBaseline')?.addEventListener('click', () => { baselineModal.style.display = 'none'; });
   document.getElementById('btnSaveBaseline')?.addEventListener('click', () => {
-    window.appState.setBaselines({
-      factoryName: document.getElementById('input_factory_name').value,
+    const formInputs = document.querySelectorAll('#baselineModal input[required]');
+    if ([...formInputs].some(input => !input.reportValidity())) return;
+
+    const baselines = {
+      factoryName: document.getElementById('input_factory_name').value.trim(),
       annualProduction: parseFloat(document.getElementById('input_annual_production').value),
       dieselUsageLiters: parseFloat(document.getElementById('input_diesel_usage').value),
       employeeCount: parseInt(document.getElementById('input_employees').value),
       commuteDistanceKm: parseFloat(document.getElementById('input_commute_km').value),
       inboundTransportKm: parseFloat(document.getElementById('input_inbound_km').value),
-      outboundTransportKm: parseFloat(document.getElementById('input_outbound_km').value)
-    });
+      outboundTransportKm: parseFloat(document.getElementById('input_outbound_km').value),
+      workingDays: parseInt(document.getElementById('input_working_days').value),
+      baseEnergyPerBottleKWh: parseFloat(document.getElementById('input_base_energy').value)
+    };
+
+    window.appState.setBaselines(baselines);
+    localStorage.setItem('netzero_baselines', JSON.stringify(window.appState.baselines));
+    localStorage.setItem('netzero_baseline_completed', 'true');
     document.getElementById('factoryNameDisplay').textContent = `${window.appState.baselines.factoryName} (${(window.appState.baselines.annualProduction/1000000).toFixed(0)}M btl/yr)`;
     baselineModal.style.display = 'none';
     triggerCalculation();
@@ -235,6 +273,7 @@ function setupModalHandlers() {
         ...window.appState.currentResults.emissions,
         ...window.appState.currentResults.financials
       }
+
     };
 
     const res = await window.NetZeroAPI.saveScenario(savePayload);
@@ -248,6 +287,7 @@ function setupModalHandlers() {
     compareSection.style.display = compareSection.style.display === 'none' ? 'block' : 'none';
     if (compareSection.style.display === 'block') {
       await loadCompareMatrix();
+      document.getElementById('btnCloseCompare')?.focus();
     }
   });
 
@@ -261,11 +301,73 @@ function setupModalHandlers() {
   });
 }
 
+function openBaselineSetup() {
+  const baselineModal = document.getElementById('baselineModal');
+  if (!baselineModal) return;
+
+  populateBaselineInputs();
+  baselineModal.classList.add('baseline-setup');
+  baselineModal.style.display = 'flex';
+  document.getElementById('btnCloseBaselineModal')?.setAttribute('style', 'display: none');
+  document.getElementById('btnCancelBaseline')?.setAttribute('style', 'display: none');
+  document.getElementById('baselineIntro').textContent =
+    'Before you explore the simulator, enter your company’s current-year baseline. The simulator will use these numbers as the reference for emissions, savings, and payback.';
+}
+
+function populateBaselineInputs() {
+  const baselines = window.appState.baselines;
+  const fieldMap = {
+    input_factory_name: baselines.factoryName,
+    input_annual_production: baselines.annualProduction,
+    input_diesel_usage: baselines.dieselUsageLiters,
+    input_employees: baselines.employeeCount,
+    input_commute_km: baselines.commuteDistanceKm,
+    input_inbound_km: baselines.inboundTransportKm,
+    input_outbound_km: baselines.outboundTransportKm,
+    input_working_days: baselines.workingDays,
+    input_base_energy: baselines.baseEnergyPerBottleKWh
+  };
+
+  Object.entries(fieldMap).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input) input.value = value;
+  });
+}
+
+function updateFactoryBaselineDisplay() {
+  const display = document.getElementById('factoryNameDisplay');
+  const baselines = window.appState.baselines;
+  if (display && baselines) {
+    display.textContent = `${baselines.factoryName} (${(baselines.annualProduction / 1000000).toFixed(0)}M btl/yr)`;
+  }
+}
+
 async function loadCompareMatrix() {
-  const scenarios = await window.NetZeroAPI.getScenarios();
+  const savedScenarios = await window.NetZeroAPI.getScenarios();
+  const currentResults = window.appState.currentResults;
+  const activeScenario = currentResults ? {
+    scenario_name: 'Current unsaved plan',
+    is_baseline: false,
+    levers: window.appState.levers,
+    results: {
+      total_emissions_tonnes: currentResults.emissions.totalEmissionsTonnes,
+      carbon_intensity_g_per_bottle: currentResults.emissions.carbonIntensityGramsPerBottle,
+      annual_savings_inr: currentResults.financials.annualSavingsINR,
+      total_capex_inr: currentResults.financials.totalCapExINR,
+      payback_years: currentResults.financials.paybackYears
+    }
+  } : null;
+  const scenarios = activeScenario
+    ? [activeScenario, ...savedScenarios]
+    : savedScenarios;
   const table = document.getElementById('compareTable');
   const narrativeBox = document.getElementById('diffNarrative');
   if (!table) return;
+
+  if (!scenarios.length) {
+    table.innerHTML = '<tbody><tr><td class="compare-empty">Save a scenario to compare factory plans.</td></tr></tbody>';
+    return;
+  }
 
   table.innerHTML = `
     <thead>
@@ -300,9 +402,12 @@ async function loadCompareMatrix() {
 
   if (narrativeBox && scenarios.length > 1) {
     const scn = scenarios[0];
+    const baseline = scenarios.find(s => s.is_baseline) || scenarios[scenarios.length - 1];
+    const baselineEmissions = Number(baseline.results?.total_emissions_tonnes || 0);
+    const scenarioEmissions = Number(scn.results?.total_emissions_tonnes || 0);
     narrativeBox.innerHTML = `
       <i class="fa-solid fa-comment-dots text-accent"></i>
-      <span><strong>Automated Scenario Diff:</strong> "${scn.scenario_name}" reduces total emissions by <strong>${Math.round(2576 - (scn.results?.total_emissions_tonnes || 2000))} Tonnes CO₂e</strong> at a rapid payback period of <strong>${scn.results?.payback_years || 0.1} years</strong>.</span>
+      <span><strong>Plan insight:</strong> "${scn.scenario_name}" changes annual emissions by <strong>${Math.abs(Math.round(baselineEmissions - scenarioEmissions))} Tonnes CO₂e</strong> versus baseline and has a payback period of <strong>${scn.results?.payback_years || 0} years</strong>.</span>
     `;
   }
 }

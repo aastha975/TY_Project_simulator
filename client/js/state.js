@@ -5,7 +5,7 @@
 class SimulatorState {
   constructor() {
     this.unitMode = 'tonnes'; // 'tonnes' (Tonnes / ₹ Lakh) or 'kg' (kg / ₹)
-    this.activeTheme = 'dark';
+    this.activeTheme = this.getPreferredTheme();
     
     this.baselines = {
       factoryName: 'Apex Aqua PET Bottling Plant',
@@ -19,7 +19,12 @@ class SimulatorState {
       baseEnergyPerBottleKWh: 0.065
     };
 
-    this.levers = {
+    const savedBaselines = localStorage.getItem('netzero_baselines');
+    if (savedBaselines) {
+      this.baselines = { ...this.baselines, ...JSON.parse(savedBaselines) };
+    }
+
+    this.defaultLevers = {
       rpetPercent: 0,
       bottleWeightGrams: 20.0,
       compressorPressureBar: 35,
@@ -33,10 +38,22 @@ class SimulatorState {
       greenSupplierDiscountPercent: 0,
       waterRecyclingPercent: 10
     };
+    this.levers = { ...this.defaultLevers };
 
     this.currentResults = null;
     this.savedScenarios = [];
     this.listeners = [];
+    this.applyTheme();
+  }
+
+  getPreferredTheme() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
+      ? 'light'
+      : 'dark';
+  }
+
+  applyTheme() {
+    document.documentElement.setAttribute('data-theme', this.activeTheme);
   }
 
   subscribe(listener) {
@@ -57,6 +74,11 @@ class SimulatorState {
     this.notify();
   }
 
+  resetLevers() {
+    this.levers = { ...this.defaultLevers };
+    this.notify();
+  }
+
   setBaselines(newBaselines) {
     this.baselines = { ...this.baselines, ...newBaselines };
     this.notify();
@@ -69,8 +91,17 @@ class SimulatorState {
 
   toggleTheme() {
     this.activeTheme = this.activeTheme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', this.activeTheme);
+    this.applyTheme();
   }
 }
 
 window.appState = new SimulatorState();
+
+if (window.matchMedia) {
+  window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', event => {
+    if (!localStorage.getItem('netzero_theme_override')) {
+      window.appState.activeTheme = event.matches ? 'light' : 'dark';
+      window.appState.applyTheme();
+    }
+  });
+}

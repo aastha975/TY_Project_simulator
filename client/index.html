@@ -1,5 +1,5 @@
 ﻿<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +8,7 @@
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
   <!-- Chart.js -->
@@ -51,6 +51,9 @@
       </button>
 
       <!-- Action Buttons -->
+      <button class="btn btn-secondary btn-reset" id="btnResetPlan" title="Reset all decarbonization sliders to the starting plan">
+        <i class="fa-solid fa-rotate-left"></i> Reset Plan
+      </button>
       <button class="btn btn-secondary" id="btnCompareScenarios"><i class="fa-solid fa-code-compare"></i> Compare Scenarios</button>
       <button class="btn btn-secondary" id="btnSaveScenario"><i class="fa-solid fa-floppy-disk"></i> Save Scenario</button>
       <button class="btn btn-primary" id="btnExportPassport"><i class="fa-solid fa-file-pdf"></i> Supplier Carbon Passport</button>
@@ -332,26 +335,33 @@
           <span id="resinStretchText">At this bottle weight (20.0g), production capacity matches baseline.</span>
         </div>
 
-        <!-- En-ROADS Style Dual Trajectory Dashboard -->
+        <!-- En-ROADS Style Stacked Emissions Pathway Dashboard -->
         <div class="card card-charts">
           <div class="card-header">
-            <div class="card-title"><i class="fa-solid fa-chart-line text-accent"></i> Multi-Year Decarbonization & Payback Trajectory (2025 → 2030)</div>
+            <div class="card-title"><i class="fa-solid fa-chart-area text-accent"></i> Factory Emissions Pathway (2025 → 2030)</div>
+            <span class="chart-summary" id="chartPathwaySummary">Active plan: 2,577 t CO₂e/yr</span>
             <div class="chart-legend-pills">
-              <span class="pill-baseline">● Baseline</span>
-              <span class="pill-active">● Active Plan</span>
+              <span class="pill-baseline">● Baseline total</span>
+              <span class="pill-source source-diesel">● Diesel</span>
+              <span class="pill-source source-electricity">● Electricity</span>
+              <span class="pill-source source-resin">● Resin</span>
+              <span class="pill-source source-logistics">● Logistics</span>
             </div>
+          </div>
+          <div class="chart-explainer">
+            <strong>How to read this:</strong> each colored layer is one emissions source. The height of all layers combined is your active plan; the dotted line is what emissions would be if the factory changed nothing.
           </div>
 
           <div class="dual-charts-grid">
-            <!-- Left Chart: Emissions Curve -->
-            <div class="chart-box">
-              <div class="chart-title-sm">Emissions Trajectory (Tonnes CO₂e / yr)</div>
+            <!-- Main Chart: Stacked Emissions Pathway -->
+            <div class="chart-box chart-box-main">
+              <div class="chart-title-sm">Where the factory's emissions come from over time</div>
               <div class="chart-wrapper">
                 <canvas id="chartEmissionsTrajectory"></canvas>
               </div>
             </div>
 
-            <!-- Right Chart: Net Cash Position / Payback Breakeven Curve -->
+            <!-- Supporting Chart: Net Cash Position / Payback Breakeven Curve -->
             <div class="chart-box">
               <div class="chart-title-sm">Cumulative Net Cash Position & Breakeven (₹ Lakh)</div>
               <div class="chart-wrapper">
@@ -422,10 +432,10 @@
     </div>
 
     <!-- Scenario Compare Overlay Matrix (Expandable) -->
-    <section class="scenario-compare-section" id="compareSection" style="display: none;">
+    <section class="scenario-compare-section" id="compareSection" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="compareTitle">
       <div class="card card-compare">
         <div class="card-header">
-          <div class="card-title"><i class="fa-solid fa-scale-unbalanced text-accent"></i> Scenario Comparison Matrix (Baseline vs Plan A vs Plan B)</div>
+          <div class="card-title" id="compareTitle"><i class="fa-solid fa-scale-unbalanced text-accent"></i> Compare Factory Plans</div>
           <button class="btn-icon" id="btnCloseCompare"><i class="fa-solid fa-xmark"></i></button>
         </div>
         
@@ -453,38 +463,51 @@
         <button class="btn-icon" id="btnCloseBaselineModal"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="modal-body">
+        <p class="baseline-intro" id="baselineIntro">
+          Start with your factory's current-year baseline. These values are used as the reference point for every emissions, cost, and payback comparison.
+        </p>
         <div class="form-group">
           <label>Factory / Company Name</label>
-          <input type="text" id="input_factory_name" value="Apex Aqua PET Bottling Plant">
+          <input type="text" id="input_factory_name" value="Apex Aqua PET Bottling Plant" required>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Annual Production (Bottles/yr)</label>
-            <input type="number" id="input_annual_production" value="25000000" step="1000000">
+            <input type="number" id="input_annual_production" value="25000000" min="1000000" step="1000000" required>
           </div>
           <div class="form-group">
             <label>Annual Diesel Fuel (Liters/yr)</label>
-            <input type="number" id="input_diesel_usage" value="18000" step="1000">
+            <input type="number" id="input_diesel_usage" value="18000" min="0" step="1000" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Total Employees</label>
-            <input type="number" id="input_employees" value="45">
+            <input type="number" id="input_employees" value="45" min="0" step="1" required>
           </div>
           <div class="form-group">
             <label>Avg Commute Distance (One-Way km)</label>
-            <input type="number" id="input_commute_km" value="12">
+            <input type="number" id="input_commute_km" value="12" min="0" step="0.1" required>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Inbound Resin Transport (km)</label>
-            <input type="number" id="input_inbound_km" value="180">
+            <input type="number" id="input_inbound_km" value="180" min="0" step="1" required>
           </div>
           <div class="form-group">
             <label>Outbound Dispatch Transport (km)</label>
-            <input type="number" id="input_outbound_km" value="120">
+            <input type="number" id="input_outbound_km" value="120" min="0" step="1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Operating Days (Days/yr)</label>
+            <input type="number" id="input_working_days" value="300" min="1" max="366" step="1" required>
+          </div>
+          <div class="form-group">
+            <label>Base Energy per Bottle (kWh/bottle)</label>
+            <input type="number" id="input_base_energy" value="0.065" min="0.001" step="0.001" required>
           </div>
         </div>
       </div>
