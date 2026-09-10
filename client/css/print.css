@@ -1,0 +1,58 @@
+﻿/* ====================================================================
+   B2B Supplier Carbon Passport - Printable PDF Stylesheet
+   ==================================================================== */
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+  }
+
+  .app-header, .factory-twin-bar, .bento-col-controls, .modal-overlay,
+  .btn, .resin-stretch-banner, .guardrails-strip, .toggle-group, .btn-icon {
+    display: none !important;
+  }
+
+  .simulator-container {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .bento-grid {
+    display: block !important;
+  }
+
+  .bento-col-analytics {
+    display: block !important;
+  }
+
+  .passport-print-view {
+    display: block !important;
+    padding: 20mm;
+  }
+
+  .card {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    page-break-inside: avoid;
+    margin-bottom: 15pt;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    margin-bottom: 15pt;
+  }
+
+  .kpi-card {
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important;
+    box-shadow: none !important;
+  }
+}
+
+.passport-print-view {
+  display: none;
+}
