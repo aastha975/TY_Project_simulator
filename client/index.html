@@ -1,0 +1,577 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetZero PET™ - Factory Decarbonization & Payback Simulator</title>
+  
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/print.css" media="print">
+</head>
+<body>
+
+  <!-- Fallback-engine indicator: shown only when the live backend is unreachable
+       and the app has silently switched to the local offline calculation engine. -->
+  <div id="offlineModeBadge" class="offline-mode-badge" style="display: none;">
+    <i class="fa-solid fa-plug-circle-exclamation"></i>
+    Offline Mode — Using Local Fallback Engine
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-logo">
+        <span class="logo-icon"><i class="fa-solid fa-leaf"></i></span>
+        <div class="brand-text">
+          <h1>NetZero PET <span class="badge-pro">PRO MSME</span></h1>
+          <p class="subtitle">Operational & Financial Decarbonization Simulator</p>
+        </div>
+      </div>
+      <div class="factory-pill">
+        <i class="fa-solid fa-industry"></i>
+        <span id="factoryNameDisplay">Apex Aqua PET Plant (25M btl/yr)</span>
+        <button class="btn-icon" id="btnEditBaseline" title="Edit Factory Baseline Inputs"><i class="fa-solid fa-sliders"></i></button>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <!-- Currency & Units Toggles -->
+      <div class="toggle-group">
+        <span class="toggle-label"><i class="fa-solid fa-scale-balanced"></i> Units:</span>
+        <button class="unit-btn active" data-unit="tonnes">Tonnes / ₹ Lakh</button>
+        <button class="unit-btn" data-unit="kg">kg / ₹</button>
+      </div>
+
+      <!-- Theme Switcher -->
+      <button class="btn-icon" id="btnToggleTheme" title="Toggle Light/Dark Theme">
+        <i class="fa-solid fa-moon"></i>
+      </button>
+
+      <!-- Action Buttons -->
+      <button class="btn btn-secondary btn-reset" id="btnResetPlan" title="Reset all decarbonization sliders to the starting plan">
+        <i class="fa-solid fa-rotate-left"></i> Reset Plan
+      </button>
+      <button class="btn btn-secondary" id="btnCompareScenarios"><i class="fa-solid fa-code-compare"></i> Compare Scenarios</button>
+      <button class="btn btn-secondary" id="btnSaveScenario"><i class="fa-solid fa-floppy-disk"></i> Save Scenario</button>
+      <button class="btn btn-primary" id="btnExportPassport"><i class="fa-solid fa-file-pdf"></i> Supplier Carbon Passport</button>
+    </div>
+  </header>
+
+  <!-- Main Simulator Container -->
+  <main class="simulator-container">
+
+    <!-- Top: Factory Process Visual Twin -->
+    <section class="factory-twin-bar">
+      <div class="process-node" data-target="lever-resin">
+        <div class="node-icon"><i class="fa-solid fa-cubes-stacked"></i></div>
+        <div class="node-info">
+          <span class="node-step">Stage 1</span>
+          <span class="node-title">Resin Silo & Blend</span>
+          <span class="node-metric" id="nodeResinStat">0% rPET (100% Virgin)</span>
+        </div>
+      </div>
+      <div class="process-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+
+      <div class="process-node" data-target="lever-molding">
+        <div class="node-icon"><i class="fa-solid fa-fire-burner"></i></div>
+        <div class="node-info">
+          <span class="node-step">Stage 2</span>
+          <span class="node-title">Preform Reheat & SBM</span>
+          <span class="node-metric" id="nodeWeightStat">20.0g Lightweighting</span>
+        </div>
+      </div>
+      <div class="process-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+
+      <div class="process-node" data-target="lever-compressor">
+        <div class="node-icon"><i class="fa-solid fa-gauge-high"></i></div>
+        <div class="node-info">
+          <span class="node-step">Stage 3</span>
+          <span class="node-title">High-Pressure Air</span>
+          <span class="node-metric" id="nodePressureStat">35.0 bar Standard</span>
+        </div>
+      </div>
+      <div class="process-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+
+      <div class="process-node" data-target="lever-power">
+        <div class="node-icon"><i class="fa-solid fa-solar-panel"></i></div>
+        <div class="node-info">
+          <span class="node-step">Stage 4</span>
+          <span class="node-title">Grid & Solar Power</span>
+          <span class="node-metric" id="nodePowerStat">0% Renewable</span>
+        </div>
+      </div>
+      <div class="process-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+
+      <div class="process-node" data-target="lever-logistics">
+        <div class="node-icon"><i class="fa-solid fa-truck-fast"></i></div>
+        <div class="node-info">
+          <span class="node-step">Stage 5</span>
+          <span class="node-title">Fleet & Dispatch</span>
+          <span class="node-metric" id="nodeFleetStat">Standard Routing</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Engineering Guardrails Notification Strip -->
+    <div class="guardrails-strip" id="guardrailsContainer" style="display: none;"></div>
+
+    <!-- Main Workspace Bento Grid -->
+    <div class="bento-grid">
+
+      <!-- LEFT COLUMN: Sliders & Controls -->
+      <div class="bento-col-controls">
+        
+        <!-- Core Primary Levers Card -->
+        <div class="card card-controls">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-sliders text-accent"></i> Core Decarbonization Levers (5)</div>
+            <span class="badge-tag">Always Active</span>
+          </div>
+
+          <!-- Lever 1: rPET % -->
+          <div class="slider-group" id="lever-resin">
+            <div class="slider-header">
+              <label><i class="fa-solid fa-recycle"></i> Recycled PET (rPET) Content</label>
+              <div class="slider-val-box"><span id="val_rpet">0</span>%</div>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="slider_rpet" min="0" max="100" step="1" value="0">
+              <span class="benchmark-marker" style="left: 20%;" title="FSSAI / PWM 2025 Mandate (20%)"></span>
+            </div>
+            <div class="slider-meta">
+              <span>0% (Virgin PET)</span>
+              <span class="text-accent-subtle">FSSAI 20% Ref</span>
+              <span>100% rPET</span>
+            </div>
+          </div>
+
+          <!-- Lever 2: Bottle Weight -->
+          <div class="slider-group" id="lever-molding">
+            <div class="slider-header">
+              <label><i class="fa-solid fa-weight-hanging"></i> Bottle Weight (Lightweighting)</label>
+              <div class="slider-val-box"><span id="val_weight">20.0</span> g</div>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="slider_weight" min="14.0" max="22.0" step="0.5" value="20.0">
+              <span class="benchmark-marker" style="left: 62.5%;" title="Standard 500ml Bottle (19-20g)"></span>
+            </div>
+            <div class="slider-meta">
+              <span>14.0g (Ultra-Light)</span>
+              <span class="text-accent-subtle">Industry Avg: 19.5g</span>
+              <span>22.0g (Heavy/Hot-fill)</span>
+            </div>
+          </div>
+
+          <!-- Lever 3: Compressor Pressure -->
+          <div class="slider-group" id="lever-compressor">
+            <div class="slider-header">
+              <label><i class="fa-solid fa-gauge"></i> Blow Molding Compressor Pressure</label>
+              <div class="slider-val-box"><span id="val_pressure">35</span> bar</div>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="slider_pressure" min="28" max="35" step="1" value="35">
+              <span class="benchmark-marker" style="left: 57%;" title="Energy Efficient Benchmark (32 bar)"></span>
+            </div>
+            <div class="slider-meta">
+              <span>28 bar (Optimized)</span>
+              <span class="text-accent-subtle">VFD Target: 31 bar</span>
+              <span>35 bar (Legacy)</span>
+            </div>
+          </div>
+
+          <!-- Lever 4: Renewable Electricity % -->
+          <div class="slider-group" id="lever-power">
+            <div class="slider-header">
+              <label><i class="fa-solid fa-sun"></i> Renewable Electricity (Solar/PPA)</label>
+              <div class="slider-val-box"><span id="val_renewable">0</span>%</div>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="slider_renewable" min="0" max="100" step="5" value="0">
+              <span class="benchmark-marker" style="left: 40%;" title="Typical Rooftop Solar Capacity (40%)"></span>
+            </div>
+            <div class="slider-meta">
+              <span>0% (100% Coal Grid)</span>
+              <span class="text-accent-subtle">Rooftop: ~40%</span>
+              <span>100% Green Power</span>
+            </div>
+          </div>
+
+          <!-- Lever 5: Low-Carbon Commute % -->
+          <div class="slider-group" id="lever-commute">
+            <div class="slider-header">
+              <label><i class="fa-solid fa-van-shuttle"></i> Low-Carbon Commute (Bus/EV)</label>
+              <div class="slider-val-box"><span id="val_commute">15</span>%</div>
+            </div>
+            <div class="slider-track-wrap">
+              <input type="range" id="slider_commute" min="0" max="100" step="5" value="15">
+            </div>
+            <div class="slider-meta">
+              <span>0% Private Vehicles</span>
+              <span>100% Shuttle / Carpool / EV</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reverse Goal-Seeker / Optimizer Presets Card -->
+        <div class="card card-optimizer">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-wand-magic-sparkles text-accent"></i> Reverse Goal-Seeker Optimizer</div>
+          </div>
+          <p class="card-desc">1-Click Pareto-optimal strategy packages designed for small factory constraints:</p>
+          <div class="preset-cards-grid" id="optimizerPackagesContainer"></div>
+        </div>
+
+        <!-- Secondary Modifiers Accordion Card -->
+        <div class="card card-accordion">
+          <button class="accordion-trigger" id="btnToggleSecondary">
+            <span><i class="fa-solid fa-layer-group text-accent"></i> Secondary Operational Levers (7)</span>
+            <i class="fa-solid fa-chevron-down accordion-chevron"></i>
+          </button>
+
+          <div class="accordion-content" id="secondaryLeversContent">
+            <!-- Lever 6: Wastage Rate -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>Material Wastage Rate (%)</label>
+                <div class="slider-val-box-sm"><span id="val_wastage">5.0</span>%</div>
+              </div>
+              <input type="range" id="slider_wastage" min="0" max="20" step="0.5" value="5.0">
+            </div>
+
+            <!-- Lever 7: Scrap Regrind Recycling -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>In-Factory Scrap Regrind (%)</label>
+                <div class="slider-val-box-sm"><span id="val_scrap">40</span>%</div>
+              </div>
+              <input type="range" id="slider_scrap" min="0" max="100" step="5" value="40">
+            </div>
+
+            <!-- Lever 8: Machine Efficiency Gain -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>Machine Overhaul Efficiency Gain (%)</label>
+                <div class="slider-val-box-sm"><span id="val_machine_eff">0</span>%</div>
+              </div>
+              <input type="range" id="slider_machine_eff" min="0" max="30" step="5" value="0">
+            </div>
+
+            <!-- Lever 9: Heat Recovery -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>Waste Heat Recovery Utilization (%)</label>
+                <div class="slider-val-box-sm"><span id="val_heat">0</span>%</div>
+              </div>
+              <input type="range" id="slider_heat" min="0" max="100" step="10" value="0">
+            </div>
+
+            <!-- Lever 10a: Fleet Diesel Efficiency (Scope 1) -->
+            <div class="slider-group-compact" id="lever-fleet-diesel">
+              <div class="slider-header">
+                <label>Fleet Diesel Efficiency (%)</label>
+                <div class="slider-val-box-sm"><span id="val_fleet_diesel">0</span>%</div>
+              </div>
+              <input type="range" id="slider_fleet_diesel" min="0" max="25" step="5" value="0">
+              <div class="slider-help-text">Reduces diesel burned by your own delivery trucks and backup generators.</div>
+            </div>
+
+            <!-- Lever 10b: Logistics Route Optimization (Scope 3) -->
+            <div class="slider-group-compact" id="lever-logistics">
+              <div class="slider-header">
+                <label>Logistics Route Optimization (%)</label>
+                <div class="slider-val-box-sm"><span id="val_logistics_route">0</span>%</div>
+              </div>
+              <input type="range" id="slider_logistics_route" min="0" max="25" step="5" value="0">
+              <div class="slider-help-text">Reduces total freight distance to suppliers and distributors.</div>
+            </div>
+
+            <!-- Lever 11: Green Supplier Adoption -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>Low-Carbon Resin Supplier (%)</label>
+                <div class="slider-val-box-sm"><span id="val_green_supplier">0</span>%</div>
+              </div>
+              <input type="range" id="slider_green_supplier" min="0" max="10" step="1" value="0">
+            </div>
+
+            <!-- Lever 12: Water Recycling -->
+            <div class="slider-group-compact">
+              <div class="slider-header">
+                <label>Closed-Loop Water Recycling (%)</label>
+                <div class="slider-val-box-sm"><span id="val_water">10</span>%</div>
+              </div>
+              <input type="range" id="slider_water" min="0" max="100" step="10" value="10">
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Real-time Analytics & En-ROADS Trajectories -->
+      <div class="bento-col-analytics">
+        
+        <!-- Live KPI Bento Bar -->
+        <div class="kpi-grid">
+          <div class="kpi-card highlight">
+            <span class="kpi-label">Bottle Carbon Intensity</span>
+            <div class="kpi-val"><span id="kpiCarbonIntensity">103.1</span> <small>g CO₂e/btl</small></div>
+            <span class="kpi-diff text-success" id="kpiIntensityDiff">-0.0% vs Baseline</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Annual Emissions</span>
+            <div class="kpi-val"><span id="kpiTotalEmissions">2,576</span> <small id="unitEmissionsLabel">Tonnes CO₂e</small></div>
+            <span class="kpi-diff text-success" id="kpiEmissionsDiff">-0.0% vs Baseline</span>
+            <span class="kpi-sub" id="kpiEmissionsEquiv">≈ 560 cars off road</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Annual OpEx Savings</span>
+            <div class="kpi-val text-success"><span id="kpiAnnualSavings">₹0.00</span> <small id="unitSavingsLabel">Lakh / yr</small></div>
+            <span class="kpi-sub" id="kpiOpexTotal">Total OpEx: ₹18.4 Cr</span>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-label">Payback Period</span>
+            <div class="kpi-val"><span id="kpiPaybackYears">0.0</span> <small>Years</small></div>
+            <span class="kpi-sub" id="kpiCapExTotal">Net CapEx: ₹0.00 Lakh</span>
+          </div>
+        </div>
+
+        <!-- Realism Insight Banner -->
+        <div class="resin-stretch-banner">
+          <i class="fa-solid fa-lightbulb text-warning"></i>
+          <span id="resinStretchText">At this bottle weight (20.0g), production capacity matches baseline.</span>
+        </div>
+
+        <!-- En-ROADS Style Stacked Emissions Pathway Dashboard -->
+        <div class="card card-charts">
+          <div class="card-header">
+            <div class="card-title"><i class="fa-solid fa-chart-area text-accent"></i> Factory Emissions Pathway (2025 → 2030)</div>
+            <div class="chart-hero-readout" id="chartPathwaySummary">
+              <div class="hero-number"><span id="heroReadoutNumber">2,577</span> <small>t CO₂e/yr</small></div>
+              <span class="hero-delta is-reduction" id="heroReadoutDelta">↓ 0% vs Baseline</span>
+            </div>
+          </div>
+
+          <div class="dual-charts-grid">
+            <!-- Main Chart: Stacked Emissions Pathway -->
+            <div class="chart-box chart-box-main">
+              <div class="chart-title-sm">Where the factory's emissions come from over time</div>
+              <div class="chart-explainer">
+                <strong>How to read this:</strong> each colored layer is one emissions source. The height of all layers combined is your active plan; the dotted line is what emissions would be if the factory changed nothing.
+              </div>
+              <div class="chart-wrapper">
+                <canvas id="chartEmissionsTrajectory"></canvas>
+              </div>
+            </div>
+
+            <!-- Supporting Chart: Net Cash Position / Payback Breakeven Curve -->
+            <div class="chart-box">
+              <div class="chart-title-sm">Cumulative Net Cash Position & Breakeven (₹ Lakh)</div>
+              <div class="chart-explainer">
+                <strong>How to read this:</strong> below the dotted line at zero means you haven't recovered your investment yet; above it means you're in profit from the changes you made.
+              </div>
+              <div class="chart-wrapper">
+                <canvas id="chartCashflow"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scope 1, 2, 3 Breakdown Donut & Reference Factors -->
+        <div class="charts-sub-grid">
+          <div class="card card-donut">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-chart-pie text-accent"></i> GHG Protocol Scope Breakdown</div>
+            </div>
+            <div class="chart-explainer">
+              <strong>How to read this:</strong> this shows where your factory's emissions come from right now — the biggest bar is your best target for reduction.
+            </div>
+            <div class="donut-wrapper">
+              <canvas id="chartScopeDonut"></canvas>
+            </div>
+          </div>
+
+          <div class="card card-methodology">
+            <div class="card-header">
+              <div class="card-title"><i class="fa-solid fa-book-open-reader text-accent"></i> Verified Emission Factors & Boundaries</div>
+            </div>
+            <div class="factors-table-wrap">
+              <table class="factors-table">
+                <thead>
+                  <tr>
+                    <th>Emission Source</th>
+                    <th>Factor Value</th>
+                    <th>Published Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Virgin PET Resin</td>
+                    <td><strong>2.30</strong> kg CO₂e/kg</td>
+                    <td>PlasticsEurope / Franklin LCA</td>
+                  </tr>
+                  <tr>
+                    <td>Recycled PET (rPET)</td>
+                    <td><strong>0.45</strong> kg CO₂e/kg</td>
+                    <td>ALPLA / Recoup Database</td>
+                  </tr>
+                  <tr>
+                    <td>Purchased Grid Power</td>
+                    <td><strong>0.79</strong> kg CO₂e/kWh</td>
+                    <td>India CEA CO₂ Baseline v19</td>
+                  </tr>
+                  <tr>
+                    <td>Diesel Generator / Fuel</td>
+                    <td><strong>2.68</strong> kg CO₂e/L</td>
+                    <td>IPCC National Guidelines</td>
+                  </tr>
+                  <tr>
+                    <td>Energy Stacking Floor</td>
+                    <td><strong>35.0%</strong> minimum</td>
+                    <td>Physics limit on SBM hydraulics</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Scenario Compare Overlay Matrix (Expandable) -->
+    <section class="scenario-compare-section" id="compareSection" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="compareTitle">
+      <div class="card card-compare">
+        <div class="card-header">
+          <div class="card-title" id="compareTitle"><i class="fa-solid fa-scale-unbalanced text-accent"></i> Compare Factory Plans</div>
+          <button class="btn-icon" id="btnCloseCompare"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        
+        <!-- Auto-diff Narrative Sentence -->
+        <div class="diff-narrative-box" id="diffNarrative">
+          <i class="fa-solid fa-comment-dots text-accent"></i>
+          <span>Select scenarios to compare against the factory baseline.</span>
+        </div>
+
+        <div class="compare-table-wrap">
+          <table class="compare-table" id="compareTable">
+            <!-- Dynamically populated -->
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Factory Baseline Inputs Modal -->
+  <div class="modal-overlay" id="baselineModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-industry text-accent"></i> Configure Factory Baseline Parameters</h3>
+        <button class="btn-icon" id="btnCloseBaselineModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="baseline-intro" id="baselineIntro">
+          Start with your factory's current-year baseline. These values are used as the reference point for every emissions, cost, and payback comparison.
+        </p>
+        <div class="form-group">
+          <label>Factory / Company Name</label>
+          <input type="text" id="input_factory_name" value="Apex Aqua PET Bottling Plant" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Annual Production (Bottles/yr)</label>
+            <input type="number" id="input_annual_production" value="25000000" min="1000000" step="1000000" required>
+          </div>
+          <div class="form-group">
+            <label>Annual Diesel Fuel (Liters/yr)</label>
+            <input type="number" id="input_diesel_usage" value="18000" min="0" step="1000" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Total Employees</label>
+            <input type="number" id="input_employees" value="45" min="0" step="1" required>
+          </div>
+          <div class="form-group">
+            <label>Avg Commute Distance (One-Way km)</label>
+            <input type="number" id="input_commute_km" value="12" min="0" step="0.1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inbound Resin Transport (km)</label>
+            <input type="number" id="input_inbound_km" value="180" min="0" step="1" required>
+          </div>
+          <div class="form-group">
+            <label>Outbound Dispatch Transport (km)</label>
+            <input type="number" id="input_outbound_km" value="120" min="0" step="1" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Operating Days (Days/yr)</label>
+            <input type="number" id="input_working_days" value="300" min="1" max="366" step="1" required>
+          </div>
+          <div class="form-group">
+            <label>Base Energy per Bottle (kWh/bottle)</label>
+            <input type="number" id="input_base_energy" value="0.065" min="0.001" step="0.001" required>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelBaseline">Cancel</button>
+        <button class="btn btn-secondary" id="btnUseDemoDefaults">Use Demo Factory (Skip Setup)</button>
+        <button class="btn btn-primary" id="btnSaveBaseline">Apply & Re-Calculate</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Scenario Modal -->
+  <div class="modal-overlay" id="saveScenarioModal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-floppy-disk text-accent"></i> Save Simulation Scenario to PostgreSQL</h3>
+        <button class="btn-icon" id="btnCloseSaveModal"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Scenario Name</label>
+          <input type="text" id="input_scenario_name" placeholder="e.g. 2026 Solar & 30% rPET Expansion">
+        </div>
+        <div class="form-group">
+          <label>Author / Manager Name</label>
+          <input type="text" id="input_created_by" value="Factory Manager">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCancelSave">Cancel</button>
+        <button class="btn btn-primary" id="btnConfirmSaveScenario">Save to PostgreSQL</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- B2B Supplier Carbon Passport Print Container -->
+  <div class="passport-print-view" id="passportPrintContainer"></div>
+
+  <!-- Application Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/state.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/guardrailsUI.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
